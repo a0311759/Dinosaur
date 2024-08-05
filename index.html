@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dinosaur Hopping Game</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to top, #87CEFA, #00BFFF); /* Sky gradient */
+            font-family: Arial, sans-serif;
+        }
+        .game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 200px;
+            border: 2px solid #000;
+            overflow: hidden;
+            background-color: #fff;
+            display: flex;
+            align-items: flex-end; /* Ensure dino and obstacles stay at the bottom */
+        }
+        .moon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 50px;
+        }
+        .dino {
+            position: absolute;
+            bottom: 0;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%; /* Makes the dino a circle */
+            text-align: center;
+            line-height: 50px;
+            font-size: 40px;
+            transform: scaleX(-1); /* Flip horizontally */
+            background: radial-gradient(circle, rgba(255,69,0,0.8) 0%, rgba(255,0,0,0) 70%); /* Radial gradient for flame effect */
+            animation: flame 1s infinite; /* Apply flame animation */
+        }
+        @keyframes flame {
+            0% {
+                background: radial-gradient(circle, rgba(255,69,0,0.8) 0%, rgba(255,0,0,0) 70%);
+                transform: scaleX(-1) translateY(0);
+            }
+            50% {
+                background: radial-gradient(circle, rgba(255,87,34,0.8) 0%, rgba(255,0,0,0) 70%);
+                transform: scaleX(-1) translateY(-10px);
+            }
+            100% {
+                background: radial-gradient(circle, rgba(255,69,0,0.8) 0%, rgba(255,0,0,0) 70%);
+                transform: scaleX(-1) translateY(0);
+            }
+        }
+        .cactus {
+            position: absolute;
+            bottom: 0;
+            font-size: 40px;
+            text-align: center;
+            line-height: 1;
+            animation: moveCactus 1.5s linear infinite;
+        }
+        .cactus.type1 {
+            width: 30px;
+            height: 50px;
+            font-size: 50px; /* Size for 🌵 */
+        }
+        .cactus.type2 {
+            width: 40px;
+            height: 40px;
+            font-size: 50px; /* Size for 🪴 */
+        }
+        .cactus.type3 {
+            width: 60px;
+            height: 20px;
+            font-size: 20px; /* Size for 🌾🌾 */
+        }
+        @keyframes moveCactus {
+            from {
+                right: -60px;
+            }
+            to {
+                right: 100%;
+            }
+        }
+        .jump {
+            animation: jump 1s;
+        }
+        @keyframes jump {
+            0% { bottom: 0; }
+            50% { bottom: 100px; }
+            100% { bottom: 0; }
+        }
+        .score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="moon">🌕</div>
+        <div class="score" id="score">Score: 0</div>
+        <div class="dino" id="dino">🦖</div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div class="modal fade" id="gameOverModal" tabindex="-1" role="dialog" aria-labelledby="gameOverModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="gameOverModalLabel"><strong>Game Over</strong></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Your final score is: <strong id="finalScore">0</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="playAgain">Play Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        let dino = document.getElementById('dino');
+        let scoreElement = document.getElementById('score');
+        let score = 0;
+        let gameOver = false;
+        let cactusTypes = ['type1', 'type2', 'type3'];
+        let lastCactusType = null;
+        let cactus;
+        let lastCactusTime = 0;
+        let minInterval = 2500; // Minimum interval in milliseconds
+        let maxInterval = 3500; // Maximum interval in milliseconds
+        const minGap = 1500; // Minimum time gap between obstacles in milliseconds
+        let cactusSpeed = 1.5; // Initial cactus speed (duration in seconds)
+
+        function getRandomCactusType() {
+            let newType;
+            do {
+                newType = cactusTypes[Math.floor(Math.random() * cactusTypes.length)];
+            } while (newType === lastCactusType);
+            lastCactusType = newType;
+            return newType;
+        }
+
+        function createCactus() {
+            let cactus = document.createElement('div');
+            cactus.classList.add('cactus');
+            document.querySelector('.game-container').appendChild(cactus);
+
+            // Assign a random type different from the last one
+            let cactusType = getRandomCactusType();
+            cactus.classList.add(cactusType);
+
+            // Set the emoji based on the cactus type
+            switch (cactusType) {
+                case 'type1':
+                    cactus.textContent = '🌵'; // Cactus emoji
+                    break;
+                case 'type2':
+                    cactus.textContent = '🪴'; // Potted plant emoji
+                    break;
+                case 'type3':
+                    cactus.textContent = '🌾🌾'; // Wheat emoji
+                    break;
+            }
+
+            // Adjust animation duration based on speed
+            cactus.style.animationDuration = `${cactusSpeed}s`;
+
+            return cactus;
+        }
+
+        function startCactusInterval() {
+            if (!gameOver) {
+                let now = Date.now();
+                let timeSinceLastCactus = now - lastCactusTime;
+                let intervalTime = Math.floor(Math.random() * (maxInterval - minInterval + 1)) + minInterval;
+
+                if (timeSinceLastCactus < minGap) {
+                    intervalTime = minGap - timeSinceLastCactus;
+                }
+
+                // Remove old cactus and create a new one
+                if (cactus) cactus.remove();
+                cactus = createCactus();
+                lastCactusTime = Date.now();
+                
+                setTimeout(startCactusInterval, intervalTime);
+            }
+        }
+
+        function jump() {
+    if (!dino.classList.contains('jump')) {
+        dino.classList.add('jump');
+        setTimeout(function() {
+            dino.classList.remove('jump');
+        }, 1000); // Match with the animation duration
+    }
+}
+
+function checkCollision() {
+    if (!cactus) return; // No cactus to collide with
+
+    let dinoRect = dino.getBoundingClientRect();
+    let cactusRect = cactus.getBoundingClientRect();
+
+    if (dinoRect.right > cactusRect.left &&
+        dinoRect.left < cactusRect.right &&
+        dinoRect.bottom > cactusRect.top &&
+        dinoRect.top < cactusRect.bottom) {
+        gameOver = true;
+        clearInterval(scoreInterval);
+        if (cactus) {
+            cactus.style.animation = 'none';
+            cactus.style.display = 'none';
+        }
+        playGameOverSound(); // Play game over sound
+        showGameOverModal(); // Show game over modal
+    }
+}
+
+function updateCactusPosition() {
+    if (cactus) {
+        let cactusRight = parseInt(window.getComputedStyle(cactus).getPropertyValue('right'));
+        if (cactusRight >= window.innerWidth) {
+            // Remove old cactus
+            cactus.remove();
+            cactus = null; // Set to null to avoid collision checking
+        } else {
+            checkCollision();
+        }
+    }
+}
+
+function increaseScore() {
+    if (!gameOver) {
+        score++;
+        scoreElement.innerText = 'Score: ' + score;
+
+        // Increase cactus speed every 50 points
+        if (score % 50 === 0) {
+            cactusSpeed *= 1.1; // Increase speed by 10%
+            document.querySelectorAll('.cactus').forEach(cactus => {
+                cactus.style.animationDuration = `${cactusSpeed}s`;
+            });
+
+            // Play achievement sound
+            playAchievementSound();
+        }
+    }
+}
+
+function playAchievementSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime); // Frequency in Hz
+    oscillator.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.2); // Duration of sound
+}
+
+function playGameOverSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(300, audioContext.currentTime); // Frequency in Hz
+    oscillator.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.5); // Duration of sound
+}
+
+function showGameOverModal() {
+    document.getElementById('finalScore').textContent = score;
+    $('#gameOverModal').modal('show'); // Show the Bootstrap modal
+}
+
+let scoreInterval = setInterval(increaseScore, 100);
+startCactusInterval();
+setInterval(updateCactusPosition, 10);
+
+document.addEventListener('keydown', function(event) {
+    if (event.code === 'Space') {
+        jump();
+        playJumpSound(); // Play sound on jump
+    }
+});
+
+document.addEventListener('touchstart', function() {
+    jump();
+    playJumpSound(); // Play sound on jump
+});
+
+function playJumpSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // Frequency in Hz
+    oscillator.connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.1); // Duration of sound
+}
+
+document.getElementById('playAgain').addEventListener('click', function() {
+    location.reload(); // Refresh the page
+});
+</script>
+</html>
