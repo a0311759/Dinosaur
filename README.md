@@ -1,3 +1,3 @@
 # Dinosaur
 
-play at : https://github.com/a0311759/Dinosaur/settings/pages
+play at : https://a0311759.github.io/Dinosaur/
